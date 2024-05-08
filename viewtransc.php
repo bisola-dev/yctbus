@@ -1,36 +1,57 @@
 
 
 <?php
+
 require_once('cann.php');
 require_once('envar2.php');
 
-// Fetch existing email and phone for display
+// Check if the account exists
 $chin = "SELECT COUNT(*) AS count FROM [Bus_Booking].[dbo].[Account] WHERE staffid='$staffy'";
 $kin = sqlsrv_query($conn, $chin);
 
-// Check if the SQL query was successful
 if ($kin === false) {
     // Handle SQL error
     echo "An error occurred while fetching account information.";
 } else {
-    // Fetch the count of rows
     $row = sqlsrv_fetch_array($kin, SQLSRV_FETCH_ASSOC);
     $count = $row['count'];
 
-    // Check if the account exists
     if ($count === 0) {
-        // Account already exists, redirect to edit page
+        // Account does not exist, redirect to create account page
         echo '<script type="text/javascript">
-        alert("You have not created an account. please create an account.");
+        alert("You have not created an account. Please create an account.");
         window.location.href="createaccount.php";
         </script>';
-    } 
+        exit; // Stop further execution
+    }
 }
 
+// Fetch wallet entries from the database and populate the table rows
+$walletQuery = "SELECT * FROM [Bus_Booking].[dbo].[wallet_trans] WHERE staffid = ? ";
+$params = array($staffy);
+$walletResult = sqlsrv_query($conn, $walletQuery, $params);
 
+if ($walletResult === false) {
+    die(print_r(sqlsrv_errors(), true));
+}
 
+// Fetch the available balance from the Finance table
+$balanceQuery = "SELECT amount FROM [Bus_Booking].[dbo].[Finance] WHERE staffid = ?";
+$params2 = array($staffy);
+$result = sqlsrv_query($conn, $balanceQuery, $params2);
 
+if ($result === false) {
+    // Error occurred while checking existing finance records
+    echo '<script type="text/javascript">alert("Error occurred while checking existing finance records");</script>';
+} else {
+    $Balance = 0; // Default value for balance
 
+    if (sqlsrv_has_rows($result)) {
+        // Record exists, update the existing record with the new amount
+        $row = sqlsrv_fetch_array($result, SQLSRV_FETCH_ASSOC);
+        $Balance = $row['amount'];
+    }
+}
 
 ?>
 <!DOCTYPE html>
@@ -150,8 +171,6 @@ if ($kin === false) {
 </head>
 <body>
 
-
-
 <div class="container">
     <div class="sidebar">
         <?php include "sidebar.php"; ?>
@@ -161,17 +180,8 @@ if ($kin === false) {
     echo "<p><b>WELCOME, $name </p></b>";
     echo "<p><i>View wallet transactions </p></i>";
 
-    // Fetch wallet entries from the database and populate the table rows
-    $walletQuery = "SELECT * FROM [Bus_Booking].[dbo].[wallet_trans] WHERE staffid = ?";
-    $params = array($staffy);
-    $walletResult = sqlsrv_query($conn, $walletQuery, $params);
-    if ($walletResult === false) {
-        die(print_r(sqlsrv_errors(), true));
-    }
-
-    // Check if there are any rows returned
+    // Display wallet transactions table
     if (sqlsrv_has_rows($walletResult)) {
-        // Display the table if there are rows
         echo "<table>";
         echo "<thead>";
         echo "<tr>";
@@ -193,25 +203,27 @@ if ($kin === false) {
         echo "</tbody>";
         echo "</table>";
     } else {
-        // Display "No transactions" message if there are no rows
         echo '<div class="no-transactions">No transactions to display.</div>';
     }
 
     // Free the result set
     sqlsrv_free_stmt($walletResult);
     ?>
-<table class="wallet-table">
-    <thead>
-        <tr>
-            <th>Available Balance</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr>
-            <td>₦<!-- Here you can display the total amount from your calculation --></td>
-        </tr>
-    </tbody>
-</table>
 
+    <!-- Display available balance -->
+    <table class="wallet-table">
+        <thead>
+            <tr>
+                <th>Available Balance</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>₦<?php echo $Balance; ?></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
 
-    
+</body>
+</html>

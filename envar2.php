@@ -11,6 +11,7 @@ $name= $surn.' '.$firs.' '.$midd;
         $description='wallet funding for '.$name;
 
             if ($staffy == ""){header("Location:logout.php");}
+            
 
 $rexr = "SELECT * FROM [Bus_Booking].[dbo].[Account] WHERE staffid='$staffy'";
 $din = sqlsrv_query($conn, $rexr);

@@ -38,7 +38,7 @@ $allowAccess = ($currentHour >= 15 && $currentHour < 16);
 if (!$allowAccess) {
     // If not within the allowed time range, display an error message and redirect to the dashboard
     echo '<script type="text/javascript">
-          alert("Booking is only available between 11:00 and 12:00 (Africa/Lagos time).");
+          alert("Booking is only available between 3:00 and 4:00pm (Africa/Lagos time).");
           window.location.href="busdashboard.php";
           </script>';
     exit; // Stop further execution
@@ -97,69 +97,107 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     
         if ($bookingCount > 0) {
             // User has already booked a ticket for the current date, display error message
-            echo '<script type="text/javascript">
-                alert("Sorry, you can only book a bus ticket once a day.");
-            </script>';
+            echo '<script type="text/javascript">alert("Sorry, you can only book a bus ticket once a day.");</script>';
         } else {
-            // Check if the user has enough balance
-            $amountQuery = "SELECT amount FROM [Bus_Booking].[dbo].[wallet_trans] WHERE staffid='$staffy'";
-            $amountQueryResult = sqlsrv_query($conn, $amountQuery);
-            if ($amountQueryResult === false) {
+            // Retrieve total available seats for the bus
+            $seatCountQuery = "SELECT noseat FROM [Bus_Booking].[dbo].[Routes] WHERE rid='$rid'";
+            $seatCountResult = sqlsrv_query($conn, $seatCountQuery);
+            if ($seatCountResult === false) {
                 throw new Exception("Failed to execute query: " . print_r(sqlsrv_errors(), true));
             }
-            $row = sqlsrv_fetch_array($amountQueryResult, SQLSRV_FETCH_ASSOC);
-            if ($row !== null && isset($row['amount'])) {
-                $existingAmount = $row['amount'];
+            $row = sqlsrv_fetch_array($seatCountResult, SQLSRV_FETCH_ASSOC);
+            $totalSeats = $row['noseat'];
     
-                if ($existingAmount >= $amount) {
-                    // Fetch total seat count for the bus
-                    $seatCountQuery = "SELECT noseat FROM [Bus_Booking].[dbo].[Routes] WHERE rid='$rid'";
-                    $seatCountResult = sqlsrv_query($conn, $seatCountQuery);
-                    if ($seatCountResult === false) {
-                        throw new Exception("Failed to execute query: " . print_r(sqlsrv_errors(), true));
-                    }
-                    $row = sqlsrv_fetch_array($seatCountResult, SQLSRV_FETCH_ASSOC);
-                    $totalSeats = $row['noseat'];
+            // Fetch total number of booked seats for the current date
+            $bookedSeatsQuery = "SELECT COUNT(*) AS booked_count FROM [Bus_Booking].[dbo].[Transactions] WHERE rid='$rid' AND booking_date='$currentDate'";
+            $bookedSeatsResult = sqlsrv_query($conn, $bookedSeatsQuery);
+            if ($bookedSeatsResult === false) {
+                throw new Exception("Failed to execute query: " . print_r(sqlsrv_errors(), true));
+            }
+            $bookedSeatsRow = sqlsrv_fetch_array($bookedSeatsResult, SQLSRV_FETCH_ASSOC);
+            $bookedSeatsCount = $bookedSeatsRow['booked_count'];
     
-                    // Ensure the total number of bookings does not exceed the total seats
-                    if ($totalSeats > 0) {
-                        $maxSeatNumber = getMaxSeatNumber($conn, $rid, $currentDate);
-                        if ($maxSeatNumber <= $totalSeats) {
-                            // Proceed with the booking
-                            // Insert booking into database
-                            $tstamp = date("Y-m-d");
-                            $seatNumber = $maxSeatNumber;
-                            
-                            $sql = "INSERT INTO [Bus_Booking].[dbo].[Transactions] (staffid, booking_date, rid, seat_no) VALUES (?, ?, ?, ?)";
-                            $stmt = sqlsrv_prepare($conn, $sql, array(&$staffy, &$tstamp, &$rid, &$seatNumber));
-                            if ($stmt) {
-                                if (sqlsrv_execute($stmt)) {
-                                    // Log success message to console
-                                    echo '<script type="text/javascript">
-                                        alert("You have successfully booked a ticket of choice.");
-                                        window.location.href="viewbooking.php";
-                                    </script>';
+            if ($bookedSeatsCount >= $totalSeats) {
+                // Bus is completely full, display error message
+                echo '<script type="text/javascript">alert("Sorry, the bus is completely full.");</script>';
+            } else {
+                // Retrieve existing amount
+                $amountQuery = "SELECT amount FROM [Bus_Booking].[dbo].[Finance] WHERE staffid='$staffy'";
+                $amountQueryResult = sqlsrv_query($conn, $amountQuery);
+                if ($amountQueryResult === false) {
+                    throw new Exception("Failed to execute query: " . print_r(sqlsrv_errors(), true));
+                }
+                $row = sqlsrv_fetch_array($amountQueryResult, SQLSRV_FETCH_ASSOC);
+                if ($row !== null && isset($row['amount'])) {
+                    $existingAmount = $row['amount'];
+    
+                    // Deduct existing amount from incoming amount
+                    $remainingAmount = $existingAmount - $amount;
+    
+                    if ($remainingAmount >= 0) {
+                        // Update existing amount in the finance table
+                        $updateQuery = "UPDATE [Bus_Booking].[dbo].[Finance] SET amount = ? WHERE staffid = ?";
+                        $updateParams = array($remainingAmount, $staffy);
+    
+                        $updateResult = sqlsrv_query($conn, $updateQuery, $updateParams);
+    
+                        if ($updateResult === false) {
+                            // Error occurred while updating the record
+                            echo '<script type="text/javascript">alert("Error occurred while updating finance records.");</script>';
+                        } else {
+                        
+            // Update successful
+            echo '<script type="text/javascript">console.log("Update successful.");</script>';
+                        // Proceed with the ticket booking
+                        // Fetch total seat count for the bus
+                        $seatCountQuery = "SELECT noseat FROM [Bus_Booking].[dbo].[Routes] WHERE rid='$rid'";
+                        $seatCountResult = sqlsrv_query($conn, $seatCountQuery);
+                        if ($seatCountResult === false) {
+                            throw new Exception("Failed to execute query: " . print_r(sqlsrv_errors(), true));
+                        }
+                        $row = sqlsrv_fetch_array($seatCountResult, SQLSRV_FETCH_ASSOC);
+                        $totalSeats = $row['noseat'];
+    
+                        // Ensure the total number of bookings does not exceed the total seats
+                        if ($totalSeats > 0) {
+                            $maxSeatNumber = getMaxSeatNumber($conn, $rid, $currentDate);
+                            if ($maxSeatNumber <= $totalSeats) {
+                                // Proceed with the booking
+                                // Insert booking into database
+                                $tstamp = date("Y-m-d");
+                                $seatNumber = $maxSeatNumber;
+                                
+                                $sql = "INSERT INTO [Bus_Booking].[dbo].[Transactions] (staffid, booking_date, rid, seat_no) VALUES (?, ?, ?, ?)";
+                                $stmt = sqlsrv_prepare($conn, $sql, array(&$staffy, &$tstamp, &$rid, &$seatNumber));
+                                if ($stmt) {
+                                    if (sqlsrv_execute($stmt)) {
+                                        // Log success message to console
+                                        echo '<script type="text/javascript">
+                                            alert("You have successfully booked a ticket of choice.");
+                                            window.location.href="viewbooking.php";
+                                        </script>';
+                                    } else {
+                                        // Log error message to console
+                                        echo '<script type="text/javascript">
+                                            alert("Ticket booking unsuccessful, Please try again.");
+                                        </script>';
+                                    }
                                 } else {
-                                    // Log error message to console
-                                    echo '<script type="text/javascript">
-                                        alert("Ticket booking unsuccessful, Please try again.");
-                                    </script>';
+                                    // Error preparing the SQL query
+                                    throw new Exception("Failed to prepare SQL statement");
                                 }
                             } else {
-                                // Error preparing the SQL query
-                                throw new Exception("Failed to prepare SQL statement");
+                                // All seats are booked for the current date
+                                echo '<script type="text/javascript">
+                                    alert("Sorry, the bus is completely full.");
+                                </script>';
                             }
                         } else {
-                            // All seats are booked for the current date
+                            // No seats available for this route
                             echo '<script type="text/javascript">
-                                alert("Sorry, the bus is completely full.");
+                                alert("Sorry, no seats available for this route.");
                             </script>';
                         }
-                    } else {
-                        // No seats available for this route
-                        echo '<script type="text/javascript">
-                            alert("Sorry, no seats available for this route.");
-                        </script>';
                     }
                 } else {
                     // User does not have enough balance
@@ -167,18 +205,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                         alert("Sorry, you dont have enough funds for this destination. Please load your wallet.");
                     </script>';
                 }
-            }
-            else {
+            } else {
                 // No data found for the user or 'amount' key not set
                 echo '<script type="text/javascript">
-                    alert("User data not found or existing amount not set.");
+                    alert("please fund your wallet.");
                 </script>';
             }
         } 
-    } catch (Exception $e) {
+    } 
+    
+} catch (Exception $e) {
         // Handle the exception here
         echo "An error occurred: " . $e->getMessage();
     }
+    
 }
 
     

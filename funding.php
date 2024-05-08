@@ -30,11 +30,13 @@ if ($kin === false) {
 
 try {
     if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+        // Extracting form data
         $amount = $_POST['amount'];
         $paymentid = '381';  
         $session = '2023/2024';
+        
         // Posting Values to REST WebService
-        // Initialize variables
+        // Initialize SOAP XML request
         $user = 'anty';
         $token = 'antymi';
         $xml = '<?xml version="1.0" encoding="utf-8"?>
@@ -55,13 +57,8 @@ try {
             </soap:Body>
         </soap:Envelope>';
         
-        // Display the XML request for debugging
-       //echo $xml;
-        
-        // The URL for the SOAP service
+        // Initialize cURL session for posting SOAP request
         $url = 'https://portal.yabatech.edu.ng/paymentsys/webservice1.asmx?op=geninvAsync_forstaff';
-        
-        // Initialize cURL session
         $curl = curl_init($url);
         curl_setopt($curl, CURLOPT_HTTPHEADER, array("Content-Type:text/xml"));
         curl_setopt($curl, CURLOPT_POST, true);
@@ -71,54 +68,76 @@ try {
         // Execute cURL session and get the response
         $result = curl_exec($curl);
         
-        // To load get your response in JSON format the below code is required
+        // Process the SOAP response
         $cleanData = preg_replace("/(<\/?)(\w+):([^>]*>)/", '$1$2$3' , $result); 
         $convertToString = simplexml_load_string($cleanData);
         $encodingToJson = json_encode($convertToString); 
-        //$responseArray=json_decode($json, true); 
-        if (curl_errno($curl)) { 
-            throw new Exception(curl_error($curl)); 
-        } 
-        curl_close($curl); //echo $json; 
         $decodeJson = json_decode($encodingToJson); 
         $data = ($decodeJson->soapBody->geninvAsync_forstaffResponse->geninvAsync_forstaffResult);
-        //echo $data;
-        //EXIT;
 
-
+        // Close cURL session
+        curl_close($curl);
+        
+        // Construct redirection URL
         $url2 = "https://onlinepay.yabatech.edu.ng/?v1=$data";  
 
-        $query = "INSERT INTO [Bus_Booking].[dbo].[wallet_trans] (staffid, amount, remita_rrr,trans_date) VALUES (?, ?, ?,?)";
+        // Insert into 'wallet_trans' table
+        $query = "INSERT INTO [Bus_Booking].[dbo].[wallet_trans] (staffid, amount, remita_rrr, trans_date) VALUES (?, ?, ?, ?)";
         $params = array($staffy, $amount, $data, $tstamp);   
-        // Execute the SQL query
         $noway3 = sqlsrv_query($conn, $query, $params);
+        
         if ($noway3 === false) {
             // Insertion failed
-            echo '<script type="text/javascript">
-                alert("Incomplete wallet funding,Please try again");
-                </script>';
+            echo '<script type="text/javascript">alert("Incomplete wallet funding, Please try again");</script>';
         } else {
-            $rowsAffected = sqlsrv_rows_affected($noway3);
-            if ($rowsAffected > 0) {
-                // Insertion successful
-                echo '<script type="text/javascript">
-                    alert("PAY NOW, CLICK OK");
-                    window.location.href="'.$url2.'";
-                    </script>';
+            // Check if the record with the staffid exists in the 'Finance' table
+            $query2 = "SELECT * FROM [Bus_Booking].[dbo].[Finance] WHERE staffid = ?";
+            $params2 = array($staffy);
+            $result = sqlsrv_query($conn, $query2, $params2);
+            
+            if ($result === false) {
+                // Error occurred while checking existing finance records
+                echo '<script type="text/javascript">alert("Error occurred while checking existing finance records");</script>';
             } else {
-                // No rows affected, insertion failed
-                echo '<script type="text/javascript">
-                    alert("Incomplete wallet funding,Please try again");
-                    </script>';
+                if (sqlsrv_has_rows($result)) {
+                    // Record exists, update the existing record with the new amount
+                    $row = sqlsrv_fetch_array($result, SQLSRV_FETCH_ASSOC);
+                    $existingAmount = $row['amount'];
+                    $newAmount = $existingAmount + $amount;
+        
+                    $updateQuery = "UPDATE [Bus_Booking].[dbo].[Finance] SET amount = ? WHERE staffid = ?";
+                    $updateParams = array($newAmount, $staffy);
+                    $updateResult = sqlsrv_query($conn, $updateQuery, $updateParams);
+        
+                    if ($updateResult === false) {
+                        // Error occurred while updating the record
+                        echo '<script type="text/javascript">alert("Error occurred while updating finance records");</script>';
+                    } else {
+                        // Update successful
+                        echo '<script type="text/javascript">alert("PAY NOW, CLICK OK"); window.location.href="'.$url2.'";</script>';
+                    }
+                } else {
+                    // Record does not exist, proceed with the insertion
+                    $insertQuery = "INSERT INTO [Bus_Booking].[dbo].[Finance] (staffid, amount) VALUES (?, ?)";
+                    $insertParams = array($staffy, $amount);
+                    $insertResult = sqlsrv_query($conn, $insertQuery, $insertParams);
+        
+                    if ($insertResult === false) {
+                        // Error occurred while inserting the record
+                        echo '<script type="text/javascript">alert("Error occurred while inserting new finance record");</script>';
+                    } else {
+                        // Insertion successful
+                        echo '<script type="text/javascript">alert("PAY NOW, CLICK OK"); window.location.href="'.$url2.'";</script>';
+                    }
+                }
             }
         }
     }
+} catch (Exception $e) {
+    // Handle exceptions
+    echo '<script type="text/javascript">alert("An error occurred: '.$e->getMessage().'");</script>';
 }
 
-catch (Exception $e) {
-    // Handle the exception here
-    echo "An error occurred: " . $e->getMessage();
-}
 
 
 ?>

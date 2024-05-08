@@ -1,3 +1,30 @@
+<?php
+require_once('cann.php');
+require_once('envar2.php');
+require_once 'phpqrcode/qrlib.php';
+
+
+$staffid = base64_decode($_GET['staffid']);
+$seat_no = base64_decode($_GET['seat_no']);
+$booking_date = base64_decode($_GET['booking_date']);
+$description = base64_decode($_GET['description']);
+$amount = base64_decode($_GET['amount']);
+
+$bookingDetails = "BookingDate: $tstamp, Name: $name, Route: $description, Amount: $amount , Seat Number:$seat_no";
+// Function to generate QR code
+function generateQRCode($bookingDetails, $fileName) {
+    // File path where you want to save the QR code image
+    $filePath = 'image/' . $fileName;
+
+    // Generate the QR code image
+    QRcode::png($bookingDetails, $filePath, QR_ECLEVEL_L, 4);
+
+    // Return the file path
+    return $filePath;
+}
+?>
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -13,7 +40,7 @@
     height: auto;
     width: 90%;
     max-width: 600px;
-    margin: 20px auto;
+    margin: 10px auto;
     background: linear-gradient(135deg, #FFFF00, #008000); /* Gradient from yellow to green */
     border: 2px solid #ccc; /* Gray border */
     border-radius: 10px; /* Rounded corners */
@@ -70,7 +97,11 @@
         <h1>Booking Details</h1>
         <div class="booking-details">
             <div class="detail">
-                <label>User Name:</label>
+            <label>Booking date:</label>
+                <span><?php echo $tstamp; ?></span>
+            </div>
+            <div class="detail">
+                <label>Staff Name:</label>
                 <span><?php echo $name; ?></span>
             </div>
             <div class="detail">
@@ -95,7 +126,10 @@ $qrCodeFilePath = generateQRCode($bookingDetails, 'booking_qrcode.png');?>
             </div>
         </div>
     </div>
+    <div style="display: flex; justify-content: center;">
     <button onclick="printDiv('printableArea')">Print</button>
+</div>
+
     <script>
     function printDiv(divName) {
     var printContents = document.getElementById(divName).innerHTML;
@@ -110,4 +144,3 @@ $qrCodeFilePath = generateQRCode($bookingDetails, 'booking_qrcode.png');?>
 </body>
 
 </html>
-

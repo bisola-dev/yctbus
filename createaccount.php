@@ -181,23 +181,24 @@ if ($stmt) {
     </div>
 
     <div class="form-container">
-        <h2>Create Account</h2>
-        <form action="" method="post">
-            <div class="form-group">
-                <label for="name">Name:</label>
-                <input type="text" id="name" name="name" placeholder="Enter your name" value ="<?php echo $name;?>" required disabled>
-            </div>
-            <div class="form-group">
-                <label for="phone">Phone Number:</label>
-                <input type="tel" id="phone" name="phone" placeholder="Enter your phone number" required pattern="[0-9]{11}">
-            </div>
-            <div class="form-group">
-                <label for="email">Email:</label>
-                <input type="email" id="email" name="email" placeholder="Enter your email address" required>
-            </div>
-            <button type="submit" class="btn-submit">Create Account</button>
-        </form>
-    </div>
+    <h2>Create Account</h2>
+    <form action="" method="post">
+        <div class="form-group">
+            <label for="name">Name:</label>
+            <input type="text" id="name" name="name" placeholder="Enter your name" value="<?php echo $name; ?>" required disabled>
+        </div>
+        <div class="form-group">
+            <label for="phone">Phone Number:</label>
+            <input type="tel" id="phone" name="phonezx" placeholder="Enter your phone number" required>
+        </div>
+        <div class="form-group">
+            <label for="email">Email:</label>
+            <input type="email" id="email" name="emailzx" placeholder="Enter your email address" required pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}">
+        </div>
+
+        <button type="submit" class="btn-submit">Create Account</button>
+    </form>
+</div>
 
 <script>
     // Function to validate phone number input
@@ -210,6 +211,11 @@ if ($stmt) {
             input.setCustomValidity(""); // Clear any previous validation message
         }
     }
+
+    // Attach the validation function to the phone input field
+    document.getElementById('phone').addEventListener('input', function() {
+        validatePhone(this);
+    });
 </script>
 </body>
 </html>
