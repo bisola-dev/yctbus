@@ -158,7 +158,7 @@ if (isset($staffy)) {
         // Output table headers
         echo "<table>";
         echo "<thead>";
-        echo "<tr><th>Staff ID</th><th>Seat Number</th><th>Booking Date</th><th>Route Description</th><th>Amount</th><th>Viewbooking</th></tr>";
+        echo "<tr><th>Staff ID</th><th>Seat Number</th><th>Booking DateDate(Y-M-D)</th><th>Route Description</th><th>Amount</th><th>Viewbooking</th></tr>";
         echo "</thead>";
         echo "<tbody>";
 
@@ -166,9 +166,9 @@ if (isset($staffy)) {
         while ($row = sqlsrv_fetch_array($result, SQLSRV_FETCH_ASSOC)) {
             echo "<tr>";
             echo "<td>" . $row['staffid'] . "</td>";
-            echo "<td>" . $row['seat_no'] . "</td>";
+            echo "<td>" . $row['ticket_type'] . " " . $row['seat_no'] . "</td>";   
             echo "<td>" . $row['booking_date']->format('Y-m-d') . "</td>"; // Assuming booking_date is a DateTime object
-
+            "<td>" . $row['ticket_type'] . "</td>";
             // Fetch additional information based on 'rid'
             $rid = $row['rid'];
             $query2 = "SELECT description, amount FROM [Bus_Booking].[dbo].[Routes] WHERE rid = ?";
@@ -185,11 +185,12 @@ if (isset($staffy)) {
 
                     $encoded_staffid = base64_encode($row['staffid']);
                     $encoded_seat_no = base64_encode($row['seat_no']);
+                    $encoded_ticket_type = base64_encode($row['ticket_type']);
                     $encoded_booking_date = base64_encode($row['booking_date']->format('Y-m-d'));
                     $encoded_description = base64_encode($description);
                     $encoded_amount = base64_encode($amount);
 
-              $link = "view.php?staffid=$encoded_staffid&seat_no=$encoded_seat_no&booking_date=$encoded_booking_date&description=$encoded_description&amount=$encoded_amount";
+              $link = "view.php?staffid=$encoded_staffid&seat_no=$encoded_seat_no&ticket_type=$encoded_ticket_type&booking_date=$encoded_booking_date&description=$encoded_description&amount=$encoded_amount";
                     echo "<td><a href=\"$link\"><button>View Details</button></a></td>";
             
                 }
